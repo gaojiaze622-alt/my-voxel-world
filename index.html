@@ -1,0 +1,97 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Voxel World</title>
+<style>
+body{margin:0;overflow:hidden;font-family:Arial;background:#87ceeb}
+#info{position:fixed;top:12px;left:12px;padding:12px;background:#ffffffdd;border-radius:12px;z-index:2}
+#pad{position:fixed;bottom:20px;left:15px;display:grid;grid-template-columns:55px 55px 55px;gap:6px;z-index:2}
+button{font-size:20px;padding:12px;border:0;border-radius:10px;background:#ffffffdd}
+#actions{position:fixed;bottom:20px;right:12px;display:grid;gap:8px;z-index:2}
+</style>
+</head>
+<body>
+<div id="info">🧱 My Voxel World 3D<br><span id="msg">Loading world...</span></div>
+<div id="pad">
+<span></span><button data-m="f">↑</button><span></span>
+<button data-m="l">←</button><button data-m="b">↓</button><button data-m="r">→</button>
+</div>
+<div id="actions"><button id="build">Build</button><button id="dig">Dig</button></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceeb);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
+camera.position.set(0,3,7);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+document.body.appendChild(renderer.domElement);
+renderer.domElement.style.cssText='position:fixed;inset:0;z-index:0';
+scene.add(new THREE.HemisphereLight(0xffffff,0x668055,2));
+const sun=new THREE.DirectionalLight(0xffffff,2);
+sun.position.set(8,15,6);scene.add(sun);
+const geo=new THREE.BoxGeometry(1,1,1),blocks=[];
+function add(x,y,z,color=0x62ad43){
+ const mesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color}));
+ mesh.position.set(x,y,z);scene.add(mesh);blocks.push(mesh);return mesh;
+}
+for(let x=-8;x<=8;x++)for(let z=-8;z<=8;z++)add(x,-.5,z);
+for(let i=0;i<5;i++){
+ let x=Math.round(Math.random()*10-5),z=Math.round(Math.random()*10-5);
+ for(let y=0;y<3;y++)add(x,y,z,0x986536);
+ for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++)
+ for(let y=2;y<=4;y++)if(Math.random()>.2)add(x+dx,y,z+dz,0x348744);
+}
+let yaw=0,pitch=0,drag=false,lx=0,ly=0;
+renderer.domElement.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY});
+addEventListener('pointerup',()=>drag=false);
+renderer.domElement.addEventListener('pointermove',e=>{
+ if(!drag)return;
+ yaw-=(e.clientX-lx)*.006;
+ pitch=Math.max(-1,Math.min(1,pitch-(e.clientY-ly)*.004));
+ lx=e.clientX;ly=e.clientY;
+});
+let move={f:0,b:0,l:0,r:0};
+document.querySelectorAll('[data-m]').forEach(b=>{
+ const k=b.dataset.m;
+ b.onpointerdown=e=>{e.preventDefault();move[k]=1};
+ b.onpointerup=b.onpointercancel=b.onpointerleave=()=>move[k]=0;
+});
+function target(){
+ const ray=new THREE.Raycaster();
+ ray.setFromCamera(new THREE.Vector2(0,0),camera);
+ return ray.intersectObjects(blocks)[0];
+}
+document.querySelector('#build').onclick=()=>{
+ const h=target();
+ if(h){let p=h.object.position.clone().add(h.face.normal);add(Math.round(p.x),Math.round(p.y),Math.round(p.z),0x986536)}
+ document.querySelector('#msg').textContent='Block placed';
+};
+document.querySelector('#dig').onclick=()=>{
+ const h=target();
+ if(h){scene.remove(h.object);blocks.splice(blocks.indexOf(h.object),1)}
+ document.querySelector('#msg').textContent='Dig action';
+};
+function animate(){
+ requestAnimationFrame(animate);
+ const f=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
+ const s=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+ if(move.f)camera.position.addScaledVector(f,.09);
+ if(move.b)camera.position.addScaledVector(f,-.09);
+ if(move.l)camera.position.addScaledVector(s,-.09);
+ if(move.r)camera.position.addScaledVector(s,.09);
+ camera.rotation.order='YXZ';camera.rotation.set(pitch,yaw,0);
+ renderer.render(scene,camera);
+}
+addEventListener('resize',()=>{
+ camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+});
+document.querySelector('#msg').textContent='World ready!';
+animate();
+</script>
+</body>
+</html>
